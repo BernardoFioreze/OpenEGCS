@@ -1,0 +1,40 @@
+OpenEGCS / liftsim
+==================
+
+This program is a modified version of liftsim, written in 2011 by Nivvedan
+and Ankush Das as a course project for CS 293 (Data Structures and Algorithms
+Lab) at IIT Bombay, and published at https://github.com/nivvedan/liftsim under
+the GNU General Public License, version 3 or (at your option) any later
+version.
+
+Modifications
+-------------
+Since 2026 Bernardo Fioreze has modified liftsim extensively. The original
+program simulated a group of elevators with a fixed dispatch rule; this version
+turns it into a discrete-event platform for benchmarking elevator dispatch
+algorithms: pluggable dispatch, group dispatch, route ordering, traffic,
+passenger behaviour, stop duration, travel time and metrics; a jerk-limited
+kinematic travel model and an electromechanical energy model; cabin capacity;
+deterministic seeded runs; a JSON snapshot of every run; reference
+implementations of published dispatch algorithms and the benches that run
+them; and a test suite.
+
+Files that carry the original 2011 header are derived from the original
+liftsim and keep its copyright notice; each says it was modified. All other
+files are new in this version, Copyright (C) 2026 Bernardo Fioreze.
+
+License
+-------
+This version is distributed under the same license as the original: the GNU
+General Public License, version 3 or (at your option) any later version. See
+COPYING for the full text.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+Third-party components
+----------------------
+Fetched at configure time by CMake (FetchContent), not distributed here:
+  - nlohmann/json (MIT License), https://github.com/nlohmann/json
+  - Catch2 (Boost Software License 1.0), https://github.com/catchorg/Catch2

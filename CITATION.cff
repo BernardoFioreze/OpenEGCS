@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "OpenEGCS: A Deterministic Discrete-Event Simulation Platform for Benchmarking Elevator Dispatch Algorithms"
+abstract: >-
+  A discrete-event simulator for benchmarking elevator dispatch algorithms, with
+  pluggable dispatch, group dispatch, route ordering, traffic and passenger
+  policies, kinematic travel and electromechanical energy models from the
+  literature, deterministic seeded runs, and reference implementations of
+  published dispatch algorithms. A modified version of liftsim (2011).
+authors:
+  - family-names: Fioreze
+    given-names: Bernardo
+license: GPL-3.0-or-later
+repository-code: "https://github.com/BernardoFioreze/OpenEGCS"
+keywords:
+  - elevator
+  - dispatching
+  - group control
+  - discrete-event simulation
+  - benchmarking
+references:
+  - type: software
+    title: liftsim
+    authors:
+      - name: Nivvedan
+      - family-names: Das
+        given-names: Ankush
+    year: 2011
+    repository-code: "https://github.com/nivvedan/liftsim"

@@ -1,0 +1,14 @@
+# Build output
+build/
+cmake-build-*/
+
+# Simulator output (written to the working directory)
+snapshot.json
+
+# Editors and tools
+.idea/
+.vscode/
+__pycache__/
+
+# Left in the working directory by tests/test_up_lunch_traffic.cpp
+test_traffic_meta.json

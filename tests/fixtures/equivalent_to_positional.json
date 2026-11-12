@@ -1,0 +1,8 @@
+{
+  "floors": 10,
+  "elevators": 3,
+  "customers": 50,
+  "arrivalRate": 0.8,
+  "sane": true,
+  "seed": 42
+}

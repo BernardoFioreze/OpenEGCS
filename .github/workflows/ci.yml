@@ -1,0 +1,144 @@
+# CI for liftsim / OpenEGCS.
+#
+# Three things in this file are deliberate:
+#
+#  1. `ctest` runs WITHOUT `-j`. See the test-suite step.
+#  2. The reference scenarios have no expected values. CI prints their
+#     aggregates; it does not gate on them (see reference_scenarios.sh).
+#  3. There is no `-Werror`. The `warnings` job reports the count without
+#     blocking, so the count cannot grow in silence.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      no_cache:
+        description: "Cold cache: checks that FetchContent still resolves from the network"
+        type: boolean
+        default: false
+
+jobs:
+  build-test:
+    name: build + suite (${{ matrix.compiler }})
+    runs-on: ubuntu-latest
+    strategy:
+      # One compiler failing does not cancel the other: if clang reports
+      # something gcc does not, both results should be visible in one run.
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the compiler
+        env:
+          COMPILER: ${{ matrix.compiler }}
+        run: |
+          if [ "$COMPILER" = "clang" ]; then
+            command -v clang++ || { sudo apt-get update && sudo apt-get install -y clang; }
+            echo "CC=clang"    >> "$GITHUB_ENV"
+            echo "CXX=clang++" >> "$GITHUB_ENV"
+          else
+            echo "CC=gcc"  >> "$GITHUB_ENV"
+            echo "CXX=g++" >> "$GITHUB_ENV"
+          fi
+
+      - name: Toolchain versions
+        run: |
+          cmake --version | head -1
+          "$CXX" --version | head -1
+
+      # Nothing is vendored: nlohmann/json comes as a tarball and Catch2 by git
+      # clone, so configure needs the network. The key includes the compiler
+      # because Catch2's build tree lives in the same directory.
+      - name: Cache dependencies (FetchContent)
+        if: ${{ !inputs.no_cache }}
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.deps
+          key: deps-${{ matrix.compiler }}-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DFETCHCONTENT_BASE_DIR=${{ github.workspace }}/.deps
+
+      - name: Build
+        run: cmake --build build -j
+
+      # WITHOUT `-j`, on purpose. Every TEST_CASE that runs a Simulator with no
+      # explicit logger writes ./snapshot.json, and catch_discover_tests gives
+      # each case its own process with the SAME working directory. In parallel
+      # they fight over that file, and the symptom is the byte-identity
+      # determinism test failing with an empty second snapshot - the one alarm
+      # this project can least afford to have ring falsely. Serial, the whole
+      # suite takes about two seconds.
+      - name: Catch2 suite (serial on purpose)
+        run: ctest --test-dir build --output-on-failure
+
+      # src/main.cpp parses the command line in main(), with no unit test of
+      # its own beyond the CLI cases in tests/CMakeLists.txt. This step runs the
+      # binary end to end on the two reference scenarios and prints their
+      # aggregates to the job summary; it does not compare them with expected
+      # values.
+      - name: Reference scenarios (smoke + aggregates)
+        run: ./.github/scripts/reference_scenarios.sh
+
+  warnings:
+    name: warnings -Wall -Wextra (non-blocking)
+    runs-on: ubuntu-latest
+    # Does not block a merge: the existing warnings are known (mostly the
+    # deprecated implicit copy constructor of Customer). This job exists so the
+    # count does not grow in silence.
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache dependencies (FetchContent)
+        if: ${{ !inputs.no_cache }}
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.deps-warn
+          key: deps-warn-${{ hashFiles('CMakeLists.txt') }}
+
+      # Builds the real project instead of assembling -I flags by hand, so the
+      # include paths come from CMake and cannot drift from it. gcc only:
+      # counting two front ends' warnings in one number would mix two
+      # baselines.
+      - name: Configure with -Wall -Wextra
+        run: >
+          cmake -S . -B build-warn
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_CXX_FLAGS="-Wall -Wextra"
+          -DFETCHCONTENT_BASE_DIR=${{ github.workspace }}/.deps-warn
+
+      - name: Build capturing the warnings
+        run: cmake --build build-warn -j 2>&1 | tee build-warn.log
+
+      - name: Report
+        if: always()
+        run: |
+          # Warnings from the dependencies are not ours: filtered out.
+          grep "warning:" build-warn.log | grep -v "/\.deps-warn/" | sort -u > warnings.txt || true
+          count=$(wc -l < warnings.txt)
+          {
+            echo "## \`-Wall -Wextra\` warnings (gcc)"
+            echo
+            echo "Unique, outside the dependencies: **$count**."
+            echo
+            echo "Baseline: **22** with gcc 13.3 (6 in \`src/\`, 15 in \`tests/\`, 1 inside libstdc++"
+            echo "instantiated from a test). Another gcc version may count differently; a count"
+            echo "above the previous run's means something new came in."
+            echo
+            echo '```'
+            cat warnings.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
